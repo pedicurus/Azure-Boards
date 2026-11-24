@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The app only talks to Azure DevOps over HTTPS. Block plain-text HTTP everywhere (Android 7-8
+  allow it by default) and trust only the system certificate authorities, never CAs a user or
+  device policy installed, so intercepting proxies cannot read Personal Access Tokens.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+    <!-- Debuggable builds only: allow a developer's own proxy CA for traffic inspection. -->
+    <debug-overrides>
+        <trust-anchors>
+            <certificates src="user" />
+        </trust-anchors>
+    </debug-overrides>
+</network-security-config>

@@ -1,0 +1,537 @@
+package com.example.data.model
+
+import androidx.compose.runtime.Immutable
+import com.squareup.moshi.Json
+import com.squareup.moshi.JsonClass
+
+fun normalizeWorkItemClassificationPath(rawPath: String?): String {
+    if (rawPath.isNullOrBlank()) return ""
+    return rawPath
+        .replace('/', '\\')
+        .split('\\')
+        .map { it.trim() }
+        .filter { it.isNotEmpty() }
+        .joinToString("\\")
+}
+
+/**
+ * Clean domain model for an Azure DevOps Work Item.
+ * Pre-computes normalized and lowercased @Transient fields once at instantiation time
+ * (on background threads) so filtering, searching, and hierarchy prefix checks run in O(1)
+ * with zero per-pass string allocations.
+ */
+@Immutable
+@JsonClass(generateAdapter = true)
+data class WorkItem(
+    val id: Int,
+    val title: String,
+    val workItemType: String,
+    val state: String,
+    val teamProject: String? = null,
+    val assignedToId: String? = null,
+    val assignedToName: String? = null,
+    val assignedToEmail: String? = null,
+    val assignedToAvatar: String? = null,
+    val createdDate: String? = null,
+    val changedDate: String? = null,
+    val description: String? = null,
+    val areaPath: String? = null,
+    val iterationPath: String? = null,
+    val priority: Int? = null,
+    val boardOrder: Double? = null,
+    val parentId: Int? = null,
+    val childIds: List<Int> = emptyList(),
+    val tags: List<String> = emptyList(),
+    val commentCount: Int? = null
+) {
+    @Transient
+    val idString: String = id.toString()
+
+    @Transient
+    val titleLower: String = title.lowercase()
+
+    @Transient
+    val normTeamProjectLower: String = teamProject?.trim()?.lowercase().orEmpty()
+
+    @Transient
+    val normTypeLower: String = workItemType.trim().lowercase()
+
+    @Transient
+    val normStateLower: String = state.trim().lowercase()
+
+    @Transient
+    val normAssigneeLower: String = assignedToName?.trim()?.lowercase().orEmpty()
+
+    @Transient
+    val isUnassigned: Boolean = normAssigneeLower.isEmpty() || normAssigneeLower == "unassigned"
+
+    /**
+     * Lower-cased once per item instead of on every search keystroke. PUBLICATION mode: the
+     * search filter can read it from more than one background thread.
+     */
+    val descriptionLower: String by lazy(LazyThreadSafetyMode.PUBLICATION) {
+        description?.lowercase().orEmpty()
+    }
+
+    @Transient
+    val normAreaPath: String = normalizeWorkItemClassificationPath(areaPath)
+
+    val normAreaPathLower: String by lazy(LazyThreadSafetyMode.NONE) {
+        normAreaPath.lowercase()
+    }
+
+    @Transient
+    val normIterationPath: String = normalizeWorkItemClassificationPath(iterationPath)
+
+    val normIterationPathLower: String by lazy(LazyThreadSafetyMode.NONE) {
+        normIterationPath.lowercase()
+    }
+
+    val tagsLower: List<String> by lazy(LazyThreadSafetyMode.NONE) {
+        if (tags.isEmpty()) {
+            emptyList()
+        } else {
+            tags.map { it.trim().lowercase() }.filter { it.isNotEmpty() }
+        }
+    }
+
+    @Transient
+    val isCompletedOrTerminalState: Boolean =
+        normStateLower == "done" ||
+            normStateLower == "closed" ||
+            normStateLower == "resolved" ||
+            normStateLower == "تکمیل" ||
+            normStateLower == "completed"
+}
+
+
+/**
+ * On-device persisted snapshot of work items and progressive sync state for an organization.
+ */
+@JsonClass(generateAdapter = true)
+data class CachedOrganizationSnapshot(
+    val organization: String,
+    val workItems: List<WorkItem> = emptyList(),
+    val unloadedProposedIds: List<Int> = emptyList(),
+    val unloadedOtherIds: List<Int> = emptyList(),
+    val lastSyncedChangedDate: String? = null,
+    val savedAtEpochMs: Long = 0L
+)
+
+/**
+ * On-device persisted snapshot of project process hierarchies, category maps, and state categories.
+ */
+@JsonClass(generateAdapter = true)
+data class CachedOrganizationMetadata(
+    val organization: String,
+    val processHierarchyByProject: Map<String, Map<String, List<String>>> = emptyMap(),
+    val categoryMapByProject: Map<String, Map<String, String>> = emptyMap(),
+    val backlogLevelsByProject: Map<String, List<List<String>>> = emptyMap(),
+    val areasByProject: Map<String, List<String>> = emptyMap(),
+    val iterationsByProject: Map<String, List<String>> = emptyMap(),
+    val stateCategoryMap: Map<String, String> = emptyMap(),
+    val typeColors: Map<String, String> = emptyMap(),
+    val typeIcons: Map<String, String> = emptyMap(),
+    val stateColors: Map<String, String> = emptyMap(),
+    /** When each project's metadata was fetched (epoch ms), by lower-case "org|project" key. */
+    val fetchedAtByProject: Map<String, Long> = emptyMap(),
+    @param:Json(name = "schemaVersion") val schemaVersion: Int = 1
+) {
+    companion object {
+        const val CURRENT_SCHEMA_VERSION = 2
+    }
+}
+
+/**
+ * Represents a configured Azure DevOps organization account and its Personal Access Token.
+ */
+@Immutable
+@JsonClass(generateAdapter = true)
+data class OrganizationAccount(
+    val organization: String,
+    val pat: String,
+    val isRemembered: Boolean = true
+) {
+    /** Never print the token: this string can end up in logs, crash reports or debugger views. */
+    override fun toString(): String =
+        "OrganizationAccount(organization=$organization, pat=<redacted>, isRemembered=$isRemembered)"
+}
+
+
+@JsonClass(generateAdapter = true)
+data class JsonPatchOperation(
+    @param:Json(name = "op") val op: String = "add",
+    @param:Json(name = "path") val path: String,
+    @param:Json(name = "value") val value: Any?
+)
+
+@JsonClass(generateAdapter = true)
+data class WiqlQueryRequest(
+    @param:Json(name = "query") val query: String
+)
+
+@JsonClass(generateAdapter = true)
+data class WiqlQueryResult(
+    @param:Json(name = "workItems") val workItems: List<WiqlWorkItemReference> = emptyList()
+)
+
+@JsonClass(generateAdapter = true)
+data class WiqlWorkItemReference(
+    @param:Json(name = "id") val id: Int,
+    @param:Json(name = "url") val url: String? = null
+)
+
+@JsonClass(generateAdapter = true)
+data class WorkItemsBatchResponse(
+    @param:Json(name = "count") val count: Int = 0,
+    @param:Json(name = "value") val value: List<RawWorkItem> = emptyList()
+)
+
+@JsonClass(generateAdapter = true)
+data class RawWorkItemRelation(
+    @param:Json(name = "rel") val rel: String? = null,
+    @param:Json(name = "url") val url: String? = null
+)
+
+@JsonClass(generateAdapter = true)
+data class RawWorkItem(
+    @param:Json(name = "id") val id: Int,
+    @param:Json(name = "url") val url: String? = null,
+    @param:Json(name = "fields") val fields: Map<String, Any?> = emptyMap(),
+    @param:Json(name = "relations") val relations: List<RawWorkItemRelation>? = emptyList()
+)
+
+@JsonClass(generateAdapter = true)
+data class ProjectsResponse(
+    @param:Json(name = "count") val count: Int? = 0,
+    @param:Json(name = "value") val value: List<ProjectItem>? = emptyList()
+)
+
+@JsonClass(generateAdapter = true)
+data class ProjectItem(
+    @param:Json(name = "id") val id: String? = null,
+    @param:Json(name = "name") val name: String? = "",
+    @param:Json(name = "description") val description: String? = null,
+    @param:Json(name = "capabilities") val capabilities: ProjectCapabilities? = null
+)
+
+@JsonClass(generateAdapter = true)
+data class ProjectCapabilities(
+    @param:Json(name = "processTemplate") val processTemplate: ProcessTemplateCapability? = null
+)
+
+@JsonClass(generateAdapter = true)
+data class ProcessTemplateCapability(
+    @param:Json(name = "templateName") val templateName: String? = null,
+    @param:Json(name = "templateTypeId") val templateTypeId: String? = null
+)
+
+@JsonClass(generateAdapter = true)
+data class ProjectWorkItemTypesResponse(
+    @param:Json(name = "count") val count: Int? = 0,
+    @param:Json(name = "value") val value: List<ProjectWorkItemTypeDefinition>? = emptyList()
+)
+
+@JsonClass(generateAdapter = true)
+data class ProjectWorkItemTypeDefinition(
+    @param:Json(name = "name") val name: String? = "",
+    @param:Json(name = "referenceName") val referenceName: String? = null,
+    @param:Json(name = "color") val color: String? = null,
+    @param:Json(name = "icon") val icon: WorkItemTypeIcon? = null,
+    @param:Json(name = "isDisabled") val isDisabled: Boolean? = false,
+    @param:Json(name = "states") val states: List<WorkItemStateDefinition>? = emptyList(),
+    @param:Json(name = "transitions") val transitions: Map<String, List<WorkItemStateTransition>>? = null
+)
+
+@JsonClass(generateAdapter = true)
+data class WorkItemStateTransition(
+    @param:Json(name = "to") val to: String? = null
+)
+
+@JsonClass(generateAdapter = true)
+data class WorkItemTypeIcon(
+    @param:Json(name = "id") val id: String? = null,
+    @param:Json(name = "url") val url: String? = null
+)
+
+@JsonClass(generateAdapter = true)
+data class WorkItemStatesResponse(
+    @param:Json(name = "count") val count: Int? = 0,
+    @param:Json(name = "value") val value: List<WorkItemStateDefinition>? = emptyList()
+)
+
+@JsonClass(generateAdapter = true)
+data class WorkItemStateDefinition(
+    @param:Json(name = "name") val name: String? = "",
+    @param:Json(name = "color") val color: String? = null,
+    @param:Json(name = "category") val category: String? = null,
+    @param:Json(name = "hidden") val hidden: Boolean? = false,
+    @param:Json(name = "isDisabled") val isDisabled: Boolean? = false
+)
+
+@JsonClass(generateAdapter = true)
+data class ProcessesResponse(
+    @param:Json(name = "count") val count: Int? = 0,
+    @param:Json(name = "value") val value: List<ProcessDefinition>? = emptyList()
+)
+
+@JsonClass(generateAdapter = true)
+data class ProcessDefinition(
+    @param:Json(name = "typeId") val typeId: String? = "",
+    @param:Json(name = "name") val name: String? = "",
+    @param:Json(name = "isEnabled") val isEnabled: Boolean? = true,
+    @param:Json(name = "projects") val projects: List<ProcessProjectRef>? = emptyList()
+)
+
+@JsonClass(generateAdapter = true)
+data class ProcessProjectRef(
+    @param:Json(name = "id") val id: String? = null,
+    @param:Json(name = "name") val name: String? = ""
+)
+
+@JsonClass(generateAdapter = true)
+data class ProcessWorkItemTypesResponse(
+    @param:Json(name = "count") val count: Int? = 0,
+    @param:Json(name = "value") val value: List<ProcessWorkItemType>? = emptyList()
+)
+
+@JsonClass(generateAdapter = true)
+data class ProcessWorkItemType(
+    @param:Json(name = "referenceName") val referenceName: String? = null,
+    @param:Json(name = "name") val name: String? = "",
+    @param:Json(name = "isDisabled") val isDisabled: Boolean? = false,
+    @param:Json(name = "customization") val customization: String? = null,
+    @param:Json(name = "color") val color: String? = null,
+    @param:Json(name = "icon") val icon: String? = null,
+    @param:Json(name = "states") val states: List<ProcessStateDefinition>? = emptyList(),
+    @param:Json(name = "behaviors") val behaviors: List<ProcessWorkItemTypeBehavior>? = emptyList()
+)
+
+@JsonClass(generateAdapter = true)
+data class ProcessWorkItemTypeBehavior(
+    @param:Json(name = "behavior") val behavior: ProcessBehaviorRef? = null,
+    @param:Json(name = "isDefault") val isDefault: Boolean? = false
+)
+
+@JsonClass(generateAdapter = true)
+data class ProcessBehaviorRef(
+    @param:Json(name = "id") val id: String? = null
+)
+
+@JsonClass(generateAdapter = true)
+data class ProcessBehaviorsResponse(
+    @param:Json(name = "count") val count: Int? = 0,
+    @param:Json(name = "value") val value: List<ProcessBehaviorDefinition>? = emptyList()
+)
+
+@JsonClass(generateAdapter = true)
+data class ProcessBehaviorDefinition(
+    @param:Json(name = "referenceName") val referenceName: String? = null,
+    @param:Json(name = "name") val name: String? = null,
+    @param:Json(name = "rank") val rank: Int? = null,
+    @param:Json(name = "inherits") val inherits: ProcessBehaviorInheritsRef? = null
+)
+
+@JsonClass(generateAdapter = true)
+data class ProcessBehaviorInheritsRef(
+    @param:Json(name = "behaviorRefName") val behaviorRefName: String? = null,
+    @param:Json(name = "id") val id: String? = null
+)
+
+@JsonClass(generateAdapter = true)
+data class ProcessStatesResponse(
+    @param:Json(name = "count") val count: Int? = 0,
+    @param:Json(name = "value") val value: List<ProcessStateDefinition>? = emptyList()
+)
+
+@JsonClass(generateAdapter = true)
+data class ProcessStateDefinition(
+    @param:Json(name = "id") val id: String? = null,
+    @param:Json(name = "name") val name: String? = "",
+    @param:Json(name = "color") val color: String? = null,
+    @param:Json(name = "stateCategory") val stateCategory: String? = null,
+    @param:Json(name = "order") val order: Int? = null,
+    @param:Json(name = "hidden") val hidden: Boolean? = false,
+    @param:Json(name = "isDisabled") val isDisabled: Boolean? = false,
+    @param:Json(name = "customizationType") val customizationType: String? = null
+)
+
+@JsonClass(generateAdapter = true)
+data class WorkItemTypeCategoriesResponse(
+    @param:Json(name = "count") val count: Int? = 0,
+    @param:Json(name = "value") val value: List<WorkItemTypeCategory>? = emptyList()
+)
+
+@JsonClass(generateAdapter = true)
+data class WorkItemTypeCategory(
+    @param:Json(name = "name") val name: String? = "",
+    @param:Json(name = "referenceName") val referenceName: String? = "",
+    @param:Json(name = "workItemTypes") val workItemTypes: List<CategoryWorkItemTypeRef>? = emptyList()
+)
+
+@JsonClass(generateAdapter = true)
+data class CategoryWorkItemTypeRef(
+    @param:Json(name = "name") val name: String? = ""
+)
+
+@JsonClass(generateAdapter = true)
+data class BacklogsResponse(
+    @param:Json(name = "count") val count: Int? = 0,
+    @param:Json(name = "value") val value: List<BacklogLevelConfiguration>? = emptyList()
+)
+
+@JsonClass(generateAdapter = true)
+data class BacklogLevelConfiguration(
+    @param:Json(name = "id") val id: String? = "",
+    @param:Json(name = "name") val name: String? = "",
+    @param:Json(name = "rank") val rank: Int? = null,
+    @param:Json(name = "type") val type: String? = null,
+    @param:Json(name = "workItemTypes") val workItemTypes: List<CategoryWorkItemTypeRef>? = emptyList()
+)
+
+@JsonClass(generateAdapter = true)
+data class BacklogConfigurationResponse(
+    @param:Json(name = "portfolioBacklogs") val portfolioBacklogs: List<BacklogLevelConfiguration>? = emptyList(),
+    @param:Json(name = "requirementBacklog") val requirementBacklog: BacklogLevelConfiguration? = null,
+    @param:Json(name = "taskBacklog") val taskBacklog: BacklogLevelConfiguration? = null,
+    @param:Json(name = "hiddenBacklogs") val hiddenBacklogs: List<String>? = emptyList(),
+    @param:Json(name = "bugsBehavior") val bugsBehavior: String? = null
+)
+
+/**
+ * Clean domain model for a Work Item Discussion comment.
+ */
+@Immutable
+@JsonClass(generateAdapter = true)
+data class WorkItemComment(
+    val id: Int,
+    val workItemId: Int,
+    val text: String,
+    val authorName: String,
+    val authorId: String? = null,
+    val authorEmail: String? = null,
+    val authorAvatar: String? = null,
+    val createdDate: String = "",
+    val formattedDate: String = "",
+    val mentionedIds: List<String> = emptyList()
+)
+
+@JsonClass(generateAdapter = true)
+data class WorkItemCommentsResponse(
+    @param:Json(name = "totalCount") val totalCount: Int? = 0,
+    @param:Json(name = "count") val count: Int? = 0,
+    @param:Json(name = "comments") val comments: List<RawWorkItemComment>? = emptyList()
+)
+
+@JsonClass(generateAdapter = true)
+data class RawWorkItemComment(
+    @param:Json(name = "id") val id: Int? = null,
+    @param:Json(name = "workItemId") val workItemId: Int? = null,
+    @param:Json(name = "text") val text: String? = null,
+    @param:Json(name = "renderedText") val renderedText: String? = null,
+    @param:Json(name = "format") val format: String? = null,
+    @param:Json(name = "mentions") val mentions: List<RawCommentMention>? = null,
+    @param:Json(name = "createdBy") val createdBy: RawCommentIdentity? = null,
+    @param:Json(name = "createdDate") val createdDate: String? = null,
+    @param:Json(name = "modifiedDate") val modifiedDate: String? = null,
+    @param:Json(name = "isDeleted") val isDeleted: Boolean? = false
+)
+
+@JsonClass(generateAdapter = true)
+data class RawCommentMention(
+    @param:Json(name = "artifactId") val artifactId: String? = null,
+    @param:Json(name = "artifactType") val artifactType: String? = null,
+    @param:Json(name = "commentId") val commentId: Int? = null,
+    @param:Json(name = "targetId") val targetId: String? = null
+)
+
+@JsonClass(generateAdapter = true)
+data class RawCommentIdentity(
+    @param:Json(name = "id") val id: String? = null,
+    @param:Json(name = "displayName") val displayName: String? = null,
+    @param:Json(name = "uniqueName") val uniqueName: String? = null,
+    @param:Json(name = "imageUrl") val imageUrl: String? = null
+)
+
+@JsonClass(generateAdapter = true)
+data class AddWorkItemCommentRequest(
+    @param:Json(name = "text") val text: String
+)
+
+@JsonClass(generateAdapter = true)
+data class ClassificationNodesResponse(
+    @param:Json(name = "count") val count: Int? = 0,
+    @param:Json(name = "value") val value: List<RawClassificationNode>? = emptyList()
+)
+
+@JsonClass(generateAdapter = true)
+data class RawClassificationNode(
+    @param:Json(name = "id") val id: Int? = null,
+    @param:Json(name = "identifier") val identifier: String? = null,
+    @param:Json(name = "name") val name: String? = null,
+    @param:Json(name = "structureType") val structureType: String? = null,
+    @param:Json(name = "hasChildren") val hasChildren: Boolean? = false,
+    @param:Json(name = "path") val path: String? = null,
+    @param:Json(name = "children") val children: List<RawClassificationNode>? = emptyList()
+)
+
+@JsonClass(generateAdapter = true)
+data class ConnectionDataResponse(
+    @param:Json(name = "authenticatedUser") val authenticatedUser: AuthenticatedUser? = null,
+    @param:Json(name = "authorizedUser") val authorizedUser: AuthenticatedUser? = null
+)
+
+@JsonClass(generateAdapter = true)
+data class AuthenticatedUser(
+    @param:Json(name = "id") val id: String? = null,
+    @param:Json(name = "providerDisplayName") val providerDisplayName: String? = null,
+    @param:Json(name = "customDisplayName") val customDisplayName: String? = null,
+    @param:Json(name = "uniqueName") val uniqueName: String? = null,
+    @param:Json(name = "properties") val properties: Map<String, Any?>? = null
+)
+
+object NotificationCategory {
+    const val ASSIGNED = "ASSIGNED"
+    const val MENTIONED = "MENTIONED"
+}
+
+/**
+ * Domain model representing a single Assigned or Mentioned notification in the app.
+ */
+@Immutable
+@JsonClass(generateAdapter = true)
+data class AppNotificationItem(
+    val id: String,
+    val organization: String,
+    val workItemId: Int,
+    val workItemTitle: String,
+    val workItemType: String,
+    val workItemState: String,
+    val teamProject: String? = null,
+    val category: String, // NotificationCategory.ASSIGNED or NotificationCategory.MENTIONED
+    val actorName: String? = null,
+    val messageSnippet: String? = null,
+    val createdDateIso: String = "",
+    val formattedDate: String = "",
+    val epochMs: Long = 0L,
+    val commentId: Int? = null,
+    val isRead: Boolean = false
+)
+
+/**
+ * On-device persisted notification feed and baseline tracking state for an organization.
+ */
+@JsonClass(generateAdapter = true)
+data class CachedNotificationsState(
+    val organization: String,
+    val detectedDisplayName: String? = null,
+    val detectedEmail: String? = null,
+    val detectedUserId: String? = null,
+    val notifications: List<AppNotificationItem> = emptyList(),
+    val notifiedNotificationIds: List<String> = emptyList(),
+    val baselineAssignedInitialized: Boolean = false,
+    val baselineMentionsInitialized: Boolean = false,
+    val knownAssignedItemStates: Map<String, String> = emptyMap(),
+    val lastCheckedChangedDateIso: String? = null
+)
+

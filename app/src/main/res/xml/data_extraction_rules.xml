@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude domain="sharedpref" path="azure_boards_prefs.xml"/>
+        <exclude domain="sharedpref" path="azure_boards_keystore_fallback_prefs.xml"/>
+        <exclude domain="file" path="azure_work_items_cache"/>
+    </cloud-backup>
+    <device-transfer>
+        <exclude domain="sharedpref" path="azure_boards_prefs.xml"/>
+        <exclude domain="sharedpref" path="azure_boards_keystore_fallback_prefs.xml"/>
+        <exclude domain="file" path="azure_work_items_cache"/>
+    </device-transfer>
+</data-extraction-rules>
