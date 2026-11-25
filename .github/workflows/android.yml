@@ -35,6 +35,17 @@ jobs:
       - name: Make gradlew executable
         run: chmod +x gradlew
 
+      # Maven Central rate-limits GitHub runners; see the comment in this init script.
+      - name: Use Google's Maven Central mirror
+        run: mkdir -p ~/.gradle/init.d && cp .github/gradle/maven-central-mirror.init.gradle.kts ~/.gradle/init.d/
+
+      # Robolectric's Android runtime jar is large and downloaded outside Gradle's cache.
+      - name: Cache Robolectric runtime
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2/repository/org/robolectric
+          key: robolectric-${{ hashFiles('gradle/libs.versions.toml') }}
+
       # The debug signing config points at a debug.keystore that is not committed.
       - name: Create throwaway debug keystore
         run: |
