@@ -60,8 +60,9 @@ version already has a release, nothing happens. Paste this instruction into AI S
 > - `versionCode` is a build counter that Google Play publishing manages. Never edit it by hand
 >   and never derive it from `versionName`. Play only requires it to be higher than the last upload.
 > - `versionName` is the version people see, written as `MAJOR.MINOR.PATCH`. Change it only when
->   I say "release". It must never be lower than the `versionName` last published on Google Play.
->   Pick the bump from the changes since the last release:
+>   I say "release". The `versionName` currently in `app/build.gradle.kts` is the last released
+>   version (treat `5.0` as `5.0.0`); you don't need git history. Never set it lower than that.
+>   Pick the bump from the changes made since then:
 >   - PATCH (+0.0.1): bug fixes, UI polish, non-breaking performance tweaks (4.0.0 → 4.0.1).
 >   - MINOR (+0.1.0): new features, backward-compatible additions. Reset PATCH to 0 (4.0.1 → 4.1.0).
 >   - MAJOR (+1.0.0): breaking changes, major redesigns, workflow rewrites. Reset MINOR and PATCH
