@@ -156,7 +156,7 @@ dependencies {
   testImplementation(libs.kotlinx.coroutines.test)
   testImplementation(libs.mockwebserver)
   testImplementation(libs.robolectric)
-  testImplementation("org.mockito:mockito-core:5.11.0")
+  testImplementation("org.mockito:mockito-core:5.24.0")
   testImplementation("org.mockito.kotlin:mockito-kotlin:6.4.0")
   androidTestImplementation(platform(libs.androidx.compose.bom))
   androidTestImplementation(libs.androidx.compose.ui.test.junit4)
