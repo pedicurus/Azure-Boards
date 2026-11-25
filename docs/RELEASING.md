@@ -56,15 +56,22 @@ The workflow then:
 A push to `main` that raises `versionName` releases automatically, with no tag needed. If the
 version already has a release, nothing happens. Paste this instruction into AI Studio:
 
-> When I say "release", do this in the same commit:
-> 1. In `app/build.gradle.kts`, set `versionName` to the new version (for example `4.0` → `4.1`).
->    Do not change `versionCode` (Google Play publishing manages it) or anything else in that file.
-> 2. Overwrite `RELEASE_NOTES.md` in the repository root with short, user-facing notes for this
->    version: a `## What's new` list, then a `## Fixes` list. Plain language, one line per item,
->    based on the changes since the last release.
-> 3. Use the commit message `release: v<versionName>`.
+> **Version numbers**
+> - `versionCode` is a build counter that Google Play publishing manages. Never edit it by hand
+>   and never derive it from `versionName`. Play only requires it to be higher than the last upload.
+> - `versionName` is the version people see, written as `MAJOR.MINOR.PATCH`. Change it only when
+>   I say "release". It must never be lower than the `versionName` last published on Google Play.
+>   Pick the bump from the changes since the last release:
+>   - PATCH (+0.0.1): bug fixes, UI polish, non-breaking performance tweaks (4.0.0 → 4.0.1).
+>   - MINOR (+0.1.0): new features, backward-compatible additions. Reset PATCH to 0 (4.0.1 → 4.1.0).
+>   - MAJOR (+1.0.0): breaking changes, major redesigns, workflow rewrites. Reset MINOR and PATCH
+>     to 0 (4.1.0 → 5.0.0).
 >
-> Never change `versionName` in any other commit.
+> **When I say "release"**, do this in one commit:
+> 1. In `app/build.gradle.kts`, set `versionName` using the rules above. Change nothing else in that file.
+> 2. Overwrite `RELEASE_NOTES.md` in the repository root with short, user-facing notes for this
+>    version: a `## What's new` list, then a `## Fixes` list. Plain language, one line per item.
+> 3. Use the commit message `release: v<versionName>`.
 
 The workflow uses `RELEASE_NOTES.md` as the release notes, or GitHub's automatic notes if that file is missing.
 
