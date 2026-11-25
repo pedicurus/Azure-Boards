@@ -28,10 +28,8 @@ jobs:
           distribution: temurin
           java-version: '21'
 
-      # The repository has no gradlew script, so install the Gradle version the wrapper names.
+      # Uses the Gradle version pinned in gradle/wrapper (checksum-verified); also caches downloads.
       - uses: gradle/actions/setup-gradle@v6
-        with:
-          gradle-version: '9.3.1'
 
       # The debug signing config points at a debug.keystore that is not committed.
       - name: Create throwaway debug keystore
@@ -41,18 +39,18 @@ jobs:
             -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
 
       - name: Unit tests
-        run: gradle :app:testDebugUnitTest --stacktrace
+        run: ./gradlew :app:testDebugUnitTest --stacktrace
 
       - name: Debug build
-        run: gradle :app:assembleDebug --stacktrace
+        run: ./gradlew :app:assembleDebug --stacktrace
 
       # Runs R8 on the release variant (no signing needed) to catch missing keep rules.
       - name: Release R8 shrink check
-        run: gradle :app:minifyReleaseWithR8 --stacktrace
+        run: ./gradlew :app:minifyReleaseWithR8 --stacktrace
 
       # Lint is reported but not yet blocking: existing findings need a baseline first.
       - name: Android Lint
-        run: gradle :app:lintDebug
+        run: ./gradlew :app:lintDebug
         continue-on-error: true
 
       - name: Upload test and lint reports
