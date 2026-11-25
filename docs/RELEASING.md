@@ -50,3 +50,20 @@ The workflow then:
 - publishes a GitHub Release with `AzureBoards-v4.1.apk`, `AzureBoards-v4.1.aab`,
   `SHA256SUMS.txt` and auto-generated release notes;
 - keeps the R8 `mapping.txt` (for decoding crash stack traces) as a private workflow artifact for 90 days.
+
+## Releasing from Google AI Studio
+
+A push to `main` that raises `versionName` releases automatically, with no tag needed. If the
+version already has a release, nothing happens. Paste this instruction into AI Studio:
+
+> When I say "release", do this in the same commit:
+> 1. In `app/build.gradle.kts`, increase `versionCode` by 1 and set `versionName` to the new
+>    version (for example `4.0` → `4.1`). Do not change anything else in that file.
+> 2. Overwrite `RELEASE_NOTES.md` in the repository root with short, user-facing notes for this
+>    version: a `## What's new` list, then a `## Fixes` list. Plain language, one line per item,
+>    based on the changes since the last release.
+> 3. Use the commit message `release: v<versionName>`.
+>
+> Never change `versionName` in any other commit.
+
+The workflow uses `RELEASE_NOTES.md` as the release notes, or GitHub's automatic notes if that file is missing.

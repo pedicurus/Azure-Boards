@@ -1,13 +1,17 @@
 name: Release
 
 # Builds a signed APK and AAB and publishes them as a GitHub Release.
-# Start it by pushing a version tag that matches versionName in app/build.gradle.kts:
-#   git tag v4.0 && git push origin v4.0
+# It starts in two ways:
+#  - A push to main that changes versionName in app/build.gradle.kts to a version with no release
+#    yet (this is how Google AI Studio releases). Notes come from RELEASE_NOTES.md if it exists.
+#  - Pushing a version tag that matches versionName: git tag v4.0 && git push origin v4.0
 # Required repository secrets (see docs/RELEASING.md):
 #   RELEASE_KEYSTORE_BASE64, STORE_PASSWORD, KEY_PASSWORD
 on:
   push:
     tags: ['v*']
+    branches: [main]
+    paths: ['app/build.gradle.kts']
 
 permissions:
   contents: read
@@ -28,20 +32,32 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - name: Check tag matches app version
+      - name: Work out version and whether to release
         id: version
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          TAG="${GITHUB_REF_NAME}"
           NAME=$(sed -n 's/^ *versionName *= *"\(.*\)".*/\1/p' app/build.gradle.kts)
           CODE=$(sed -n 's/^ *versionCode *= *\([0-9]*\).*/\1/p' app/build.gradle.kts)
-          if [ "$TAG" != "v$NAME" ]; then
-            echo "::error::Tag $TAG does not match versionName $NAME. Bump versionName/versionCode in app/build.gradle.kts or tag v$NAME."
-            exit 1
-          fi
+          TAG="v$NAME"
           echo "name=$NAME" >> "$GITHUB_OUTPUT"
           echo "code=$CODE" >> "$GITHUB_OUTPUT"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          if [ "$GITHUB_REF_TYPE" = "tag" ]; then
+            if [ "$GITHUB_REF_NAME" != "$TAG" ]; then
+              echo "::error::Tag $GITHUB_REF_NAME does not match versionName $NAME. Bump versionName/versionCode in app/build.gradle.kts or tag $TAG."
+              exit 1
+            fi
+          elif gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 \
+               || git ls-remote --exit-code --tags origin "refs/tags/$TAG" >/dev/null; then
+            echo "Version $NAME is already released; nothing to do."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "skip=false" >> "$GITHUB_OUTPUT"
 
       - name: Check signing secrets are set
+        if: steps.version.outputs.skip != 'true'
         env:
           KEYSTORE_B64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
           STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
@@ -57,15 +73,18 @@ jobs:
           fi
 
       - uses: actions/setup-java@v6
+        if: steps.version.outputs.skip != 'true'
         with:
           distribution: temurin
           java-version: '21'
 
       - uses: gradle/actions/setup-gradle@v6
+        if: steps.version.outputs.skip != 'true'
         with:
           cache-read-only: true
 
       - name: Restore upload keystore
+        if: steps.version.outputs.skip != 'true'
         env:
           KEYSTORE_B64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
         run: |
@@ -75,21 +94,25 @@ jobs:
       # The debug signing config points at a debug.keystore that is not committed; unit tests
       # build the debug variant, so create a throwaway one.
       - name: Create throwaway debug keystore
+        if: steps.version.outputs.skip != 'true'
         run: |
           keytool -genkeypair -keystore debug.keystore -storepass android \
             -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 \
             -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
 
       - name: Unit tests
+        if: steps.version.outputs.skip != 'true'
         run: ./gradlew :app:testDebugUnitTest --stacktrace
 
       - name: Build signed APK and AAB
+        if: steps.version.outputs.skip != 'true'
         env:
           STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: ./gradlew :app:assembleRelease :app:bundleRelease --stacktrace
 
       - name: Verify signature and collect files
+        if: steps.version.outputs.skip != 'true'
         run: |
           APKSIGNER=$(ls -d "$ANDROID_HOME"/build-tools/*/ | sort -V | tail -1)apksigner
           mkdir -p dist
@@ -102,6 +125,7 @@ jobs:
       # R8 mapping turns obfuscated crash stack traces back into readable ones. Kept private
       # as a workflow artifact rather than attached to the public release.
       - name: Upload R8 mapping file
+        if: steps.version.outputs.skip != 'true'
         uses: actions/upload-artifact@v7
         with:
           name: mapping-v${{ steps.version.outputs.name }}
@@ -110,20 +134,24 @@ jobs:
           if-no-files-found: warn
 
       - name: Publish GitHub Release
+        if: steps.version.outputs.skip != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           # A tag made from the GitHub website ("Draft a new release") already has a release:
           # attach the files to it instead of creating a second one.
-          if gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            gh release upload "$GITHUB_REF_NAME" dist/* --repo "$GITHUB_REPOSITORY" --clobber
+          TAG="${{ steps.version.outputs.tag }}"
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload "$TAG" dist/* --repo "$GITHUB_REPOSITORY" --clobber
             exit 0
           fi
-          gh release create "$GITHUB_REF_NAME" dist/* \
+          if [ -s RELEASE_NOTES.md ]; then NOTES=(--notes-file RELEASE_NOTES.md); else NOTES=(--generate-notes); fi
+          # Creates the tag on this commit when the run came from a push to main.
+          gh release create "$TAG" dist/* \
             --repo "$GITHUB_REPOSITORY" \
-            --title "Azure Boards $GITHUB_REF_NAME (build ${{ steps.version.outputs.code }})" \
-            --generate-notes \
-            --verify-tag
+            --target "$GITHUB_SHA" \
+            --title "Azure Boards $TAG (build ${{ steps.version.outputs.code }})" \
+            "${NOTES[@]}"
 
       - name: Remove keystore
         if: always()
