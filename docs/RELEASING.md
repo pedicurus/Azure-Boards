@@ -57,8 +57,8 @@ A push to `main` that raises `versionName` releases automatically, with no tag n
 version already has a release, nothing happens. Paste this instruction into AI Studio:
 
 > When I say "release", do this in the same commit:
-> 1. In `app/build.gradle.kts`, increase `versionCode` by 1 and set `versionName` to the new
->    version (for example `4.0` → `4.1`). Do not change anything else in that file.
+> 1. In `app/build.gradle.kts`, set `versionName` to the new version (for example `4.0` → `4.1`).
+>    Do not change `versionCode` (Google Play publishing manages it) or anything else in that file.
 > 2. Overwrite `RELEASE_NOTES.md` in the repository root with short, user-facing notes for this
 >    version: a `## What's new` list, then a `## Fixes` list. Plain language, one line per item,
 >    based on the changes since the last release.
@@ -67,3 +67,8 @@ version already has a release, nothing happens. Paste this instruction into AI S
 > Never change `versionName` in any other commit.
 
 The workflow uses `RELEASE_NOTES.md` as the release notes, or GitHub's automatic notes if that file is missing.
+
+`versionCode` is owned by AI Studio's Google Play publishing, which raises it each time it
+publishes. Google Play only accepts a `versionCode` higher than the last one it received.
+The GitHub release pipeline only looks at `versionName`, so a Play publish never starts a
+GitHub release by accident.
