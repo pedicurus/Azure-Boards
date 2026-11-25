@@ -6,6 +6,10 @@ updates:
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
+    ignore:
+      # Google AI Studio runs unit tests offline with only the Android runtime that Robolectric
+      # 4.16.x uses; newer Robolectric versions need a runtime jar it does not have.
+      - dependency-name: "org.robolectric:robolectric"
     groups:
       compose:
         patterns: ["androidx.compose*"]
