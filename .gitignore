@@ -16,3 +16,10 @@
 local.properties
 .env
 debug.keystore
+
+# Signing keys and keystore files: never commit these.
+*.jks
+*.keystore
+*.p12
+*.pem
+keystore.properties

@@ -196,9 +196,9 @@ app/src/main/java/com/example/
 
 ### Pre-Compiled Release Status
 > [!TIP]
-> **Latest Release:** `v4.0` (`Build 4`) — pre-built APK available in [`Releases/AzureBoards-v4.0.apk`](./Releases/AzureBoards-v4.0.apk).
+> Signed APKs are published on the [**GitHub Releases page**](https://github.com/pedicurus/Azure-Boards/releases/latest).
 
-You can install the APK directly from the `Releases/` folder or build the application from source using the steps in [Building from Source](#-building-from-source).
+Download the latest `AzureBoards-vX.Y.apk` from there, or build the application from source using the steps in [Building from Source](#-building-from-source). Maintainers: see [`docs/RELEASING.md`](./docs/RELEASING.md) for how releases are cut.
 
 ---
 
@@ -234,14 +234,14 @@ Transparency is essential for developer tools that handle workspace credentials.
 
 ```bash
 # 1. Clone the repository
-git clone https://github.com/your-username/azure-boards-android.git
-cd azure-boards-android
+git clone https://github.com/pedicurus/Azure-Boards.git
+cd Azure-Boards
 
 # 2. Compile Debug APK
-gradle assembleDebug
+./gradlew assembleDebug
 
 # 3. Run unit & Robolectric tests
-gradle :app:testDebugUnitTest
+./gradlew :app:testDebugUnitTest
 ```
 
 ### First-Launch Setup
@@ -273,9 +273,9 @@ Background notification checks are scheduled through AndroidX <code>WorkManager<
 </details>
 
 <details>
-<summary><b>Why is there no APK download link yet?</b></summary>
+<summary><b>Where do I download the APK?</b></summary>
 <br>
-We have not cut our first public APK release yet. Once the initial release is tagged, a direct APK download badge and signed release binary will be published in the repository's Releases section.
+Signed APKs are published automatically on the repository's <a href="https://github.com/pedicurus/Azure-Boards/releases">Releases page</a> whenever a version is tagged. If the page is empty, the first release has not been tagged yet.
 </details>
 
 ---
