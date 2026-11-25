@@ -53,27 +53,38 @@ The workflow then:
 
 ## Releasing from Google AI Studio
 
-A push to `main` that raises `versionName` releases automatically, with no tag needed. If the
+Any push to `main` whose `versionName` has no release yet releases automatically, with no tag needed. If the
 version already has a release, nothing happens. Paste this instruction into AI Studio:
 
 > **Version numbers**
 > - `versionCode` is a build counter that Google Play publishing manages. Never edit it by hand
->   and never derive it from `versionName`. Play only requires it to be higher than the last upload.
-> - `versionName` is the version people see, written as `MAJOR.MINOR.PATCH`. Change it only when
->   I say "release". The `versionName` currently in `app/build.gradle.kts` is the last released
->   version (treat `5.0` as `5.0.0`); you don't need git history. Never set it lower than that.
->   Pick the bump from the changes made since then:
->   - PATCH (+0.0.1): bug fixes, UI polish, non-breaking performance tweaks (4.0.0 → 4.0.1).
->   - MINOR (+0.1.0): new features, backward-compatible additions. Reset PATCH to 0 (4.0.1 → 4.1.0).
+>   and never derive it from `versionName`.
+> - `versionName` is the version people see, written as `MAJOR.MINOR.PATCH`. Change it only during
+>   a release. The `versionName` currently in `app/build.gradle.kts` is the last released version
+>   (treat `5.0` as `5.0.0`); you don't need git history. Never set it lower than that.
+>   - PATCH (+0.0.1): bug fixes, UI polish, non-breaking performance tweaks (5.0.0 → 5.0.1).
+>   - MINOR (+0.1.0): new features, backward-compatible additions. Reset PATCH to 0 (5.0.1 → 5.1.0).
 >   - MAJOR (+1.0.0): breaking changes, major redesigns, workflow rewrites. Reset MINOR and PATCH
->     to 0 (4.1.0 → 5.0.0).
+>     to 0 (5.1.0 → 6.0.0).
 >
-> **When I say "release"**, do this in one commit:
-> 1. In `app/build.gradle.kts`, set `versionName` using the rules above. Change nothing else in that file.
-> 2. Overwrite `RELEASE_NOTES.md` in the repository root with short, user-facing notes for this
->    version: a `## What's new` list, then a `## Fixes` list. Plain language, one line per item.
-> 3. Use the commit message `release: v<versionName>`.
+> **When I say "release":**
+> 1. Run all tests. If any fail, stop and tell me.
+> 2. Check that the release build has R8 enabled (`isMinifyEnabled = true`) and is not debuggable.
+>    If not, stop and tell me; don't fix it inside the release.
+> 3. Review the changes made since the current `versionName` was set, then propose the bump
+>    (PATCH / MINOR / MAJOR) and the new version with a one-line reason. Wait for my confirmation.
+> 4. In `app/build.gradle.kts`, set `versionName` to the confirmed version. Change nothing else in that file.
+> 5. Overwrite `RELEASE_NOTES.md` in the repository root with short, user-facing notes for this
+>    version, using these sections and leaving out any that are empty: `## New`, `## Improved`,
+>    `## Fixed`, `## Breaking changes`, `## Security`. Plain language, one line per item.
+> 6. Change only these two files. Remind me to sync both to GitHub together; no git commands or
+>    commit message are needed.
+> 7. In your reply, show me the full contents of `RELEASE_NOTES.md`.
+>
+> Never build, sign or upload the APK/AAB yourself, and never commit them or the keystore:
+> GitHub builds and signs the release.
 
+The commit message doesn't matter: the pipeline only checks whether `versionName` changed.
 The workflow uses `RELEASE_NOTES.md` as the release notes, or GitHub's automatic notes if that file is missing.
 
 `versionCode` is owned by AI Studio's Google Play publishing, which raises it each time it
