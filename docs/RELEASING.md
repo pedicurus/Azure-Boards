@@ -68,12 +68,13 @@ version already has a release, nothing happens. Paste this instruction into AI S
 >   - MAJOR (+1.0.0): breaking changes, major redesigns, workflow rewrites. Reset MINOR and PATCH
 >     to 0 (4.1.0 → 5.0.0).
 >
-> **When I say "release"**, do this in one commit:
+> **When I say "release"**, change these two files together, so they reach GitHub in the same sync:
 > 1. In `app/build.gradle.kts`, set `versionName` using the rules above. Change nothing else in that file.
 > 2. Overwrite `RELEASE_NOTES.md` in the repository root with short, user-facing notes for this
 >    version: a `## What's new` list, then a `## Fixes` list. Plain language, one line per item.
-> 3. Use the commit message `release: v<versionName>`.
+> 3. No git commands or commit message are needed: syncing to GitHub is enough.
 
+The commit message doesn't matter: the pipeline only checks whether `versionName` changed.
 The workflow uses `RELEASE_NOTES.md` as the release notes, or GitHub's automatic notes if that file is missing.
 
 `versionCode` is owned by AI Studio's Google Play publishing, which raises it each time it
