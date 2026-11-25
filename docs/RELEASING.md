@@ -53,7 +53,7 @@ The workflow then:
 
 ## Releasing from Google AI Studio
 
-A push to `main` that raises `versionName` releases automatically, with no tag needed. If the
+Any push to `main` whose `versionName` has no release yet releases automatically, with no tag needed. If the
 version already has a release, nothing happens. Paste this instruction into AI Studio:
 
 > **Version numbers**

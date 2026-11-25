@@ -2,16 +2,16 @@ name: Release
 
 # Builds a signed APK and AAB and publishes them as a GitHub Release.
 # It starts in two ways:
-#  - A push to main that changes versionName in app/build.gradle.kts to a version with no release
-#    yet (this is how Google AI Studio releases). Notes come from RELEASE_NOTES.md if it exists.
+#  - Any push to main whose versionName in app/build.gradle.kts has no release yet (this is how Google AI Studio releases). Notes come from RELEASE_NOTES.md if it exists.
 #  - Pushing a version tag that matches versionName: git tag v4.0 && git push origin v4.0
 # Required repository secrets (see docs/RELEASING.md):
 #   RELEASE_KEYSTORE_BASE64, STORE_PASSWORD, KEY_PASSWORD
 on:
   push:
     tags: ['v*']
+    # Every push to main is checked (a few seconds when there is nothing to do), so a versionName
+    # that couldn't be released earlier is picked up automatically by the next push.
     branches: [main]
-    paths: ['app/build.gradle.kts']
 
 permissions:
   contents: read
