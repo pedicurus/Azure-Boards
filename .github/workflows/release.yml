@@ -113,6 +113,12 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          # A tag made from the GitHub website ("Draft a new release") already has a release:
+          # attach the files to it instead of creating a second one.
+          if gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" dist/* --repo "$GITHUB_REPOSITORY" --clobber
+            exit 0
+          fi
           gh release create "$GITHUB_REF_NAME" dist/* \
             --repo "$GITHUB_REPOSITORY" \
             --title "Azure Boards $GITHUB_REF_NAME (build ${{ steps.version.outputs.code }})" \

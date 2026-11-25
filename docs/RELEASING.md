@@ -29,12 +29,18 @@ Never commit the keystore: `*.jks` and `*.keystore` are in `.gitignore`.
 
 1. In `app/build.gradle.kts`, raise `versionCode` by one and set `versionName` (for example `4.1`).
 2. Merge that change to `main`.
-3. Tag the merge commit with `v` + `versionName` and push the tag:
+3. Create the tag `v` + `versionName` on `main`, in either of these ways:
 
-   ```bash
-   git tag v4.1
-   git push origin v4.1
-   ```
+   - **On the GitHub website (no tools needed):** open the repository's **Releases** page,
+     click **Draft a new release**, then **Choose a tag**, type `v4.1` and pick
+     **Create new tag: v4.1 on publish**. Leave the target as `main`, then click **Publish release**.
+     The app files get attached to that release a few minutes later.
+   - **From a terminal:**
+
+     ```bash
+     git tag v4.1 origin/main
+     git push origin v4.1
+     ```
 
 The workflow then:
 
