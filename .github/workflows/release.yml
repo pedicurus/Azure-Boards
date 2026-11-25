@@ -83,6 +83,11 @@ jobs:
         with:
           cache-read-only: true
 
+      # Some editors (e.g. Google AI Studio) drop the executable bit on gradlew when committing.
+      - name: Make gradlew executable
+        if: steps.version.outputs.skip != 'true'
+        run: chmod +x gradlew
+
       - name: Restore upload keystore
         if: steps.version.outputs.skip != 'true'
         env:

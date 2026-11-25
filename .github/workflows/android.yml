@@ -31,6 +31,10 @@ jobs:
       # Uses the Gradle version pinned in gradle/wrapper (checksum-verified); also caches downloads.
       - uses: gradle/actions/setup-gradle@v6
 
+      # Some editors (e.g. Google AI Studio) drop the executable bit on gradlew when committing.
+      - name: Make gradlew executable
+        run: chmod +x gradlew
+
       # The debug signing config points at a debug.keystore that is not committed.
       - name: Create throwaway debug keystore
         run: |
